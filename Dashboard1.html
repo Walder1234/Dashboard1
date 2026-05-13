@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Environmental Data Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            margin-bottom: 30px;
+        }
+
+        h1 { margin: 0; font-size: 1.8rem; font-weight: 700; }
+        p.subtitle { color: var(--text-muted); margin: 5px 0 0 0; }
+
+        /* Metrics Grid */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .metric-card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+            text-align: center;
+        }
+
+        .metric-card h3 {
+            margin: 0;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+        }
+
+        .metric-card .value {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--primary);
+            margin-top: 10px;
+        }
+
+        /* Filters */
+        .filter-section {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            margin-bottom: 30px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: flex-end;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            flex: 1;
+            min-width: 200px;
+        }
+
+        label { font-weight: 600; font-size: 0.85rem; }
+
+        select, input, button {
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            outline: none;
+        }
+
+        button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: opacity 0.2s;
+        }
+
+        button:hover { opacity: 0.9; }
+        button.reset { background: #ef4444; }
+
+        /* Charts Grid */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .chart-container {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+            min-height: 350px;
+        }
+
+        .chart-container.full-width {
+            grid-column: 1 / -1;
+        }
+
+        /* Table */
+        .table-section {
+            background: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+
+        .table-controls {
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        th {
+            background: #f1f5f9;
+            text-align: left;
+            padding: 12px 20px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        th:hover { background: #e2e8f0; }
+
+        td {
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        tr:last-child td { border-bottom: none; }
+        tr.active-row { background-color: #eff6ff !important; }
+
+        /* Pagination */
+        .pagination {
+            padding: 15px 20px;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            border-top: 1px solid var(--border);
+        }
+
+        .page-btn {
+            padding: 5px 12px;
+            border: 1px solid var(--border);
+            background: white;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .page-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        @media (max-width: 768px) {
+            .charts-grid { grid-template-columns: 1fr; }
+            .filter-group { flex: 1 1 100%; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Global Environmental Dashboard</h1>
+        <p class="subtitle">Analyzing Air Quality and Water Pollution across cities</p>
+    </header>
+
+    <div class="metrics-grid">
+        <div class="metric-card">
+            <h3>Avg Air Quality</h3>
+            <div id="metric-air" class="value">0</div>
+        </div>
+        <div class="metric-card">
+            <h3>Avg Water Pollution</h3>
+            <div id="metric-water" class="value">0</div>
+        </div>
+        <div class="metric-card">
+            <h3>Total Cities</h3>
+            <div id="metric-cities" class="value">0</div>
+        </div>
+        <div class="metric-card">
+            <h3>Total Countries</h3>
+            <div id="metric-countries" class="value">0</div>
+        </div>
+    </div>
+
+    <div class="filter-section">
+        <div class="filter-group">
+            <label>Country</label>
+            <select id="countryFilter">
+                <option value="all">All Countries</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>Region</label>
+            <select id="regionFilter">
+                <option value="all">All Regions</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>Search</label>
+            <input type="text" id="tableSearch" placeholder="Search City or Country...">
+        </div>
+        <button id="resetBtn" class="reset">Reset Filters</button>
+    </div>
+
+    <div class="charts-grid">
+        <div class="chart-container">
+            <canvas id="airChart"></canvas>
+        </div>
+        <div class="chart-container">
+            <canvas id="waterChart"></canvas>
+        </div>
+        <div class="chart-container full-width">
+            <canvas id="scatterChart"></canvas>
+        </div>
+    </div>
+
+    <div class="table-section">
+        <div class="table-controls">
+            <span id="rowCount">Showing 0-0 of 0 entries</span>
+        </div>
+        <div style="overflow-x: auto;">
+            <table id="dataTable">
+                <thead>
+                    <tr>
+                        <th onclick="sortTable('City')">City ↕</th>
+                        <th onclick="sortTable('Country')">Country ↕</th>
+                        <th onclick="sortTable('Region')">Region ↕</th>
+                        <th onclick="sortTable('AirQuality')">Air Quality ↕</th>
+                        <th onclick="sortTable('WaterPollution')">Water Pollution ↕</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
+        <div class="pagination" id="pagination"></div>
+    </div>
+</div>
+
+<script>
+/** * DATA SOURCE
+ * Replace the string below with your full CSV content. 
+ */
+const csvData = `City,Region,Country,AirQuality,WaterPollution
+London,Western Europe,United Kingdom,42.5,38.2
+Paris,Western Europe,France,48.3,41.5
+New York,Northern America,United States,35.8,32.1
+Tokyo,Eastern Asia,Japan,52.1,47.3
+Beijing,Eastern Asia,China,85.2,78.4
+Delhi,Southern Asia,India,92.3,85.7
+Cairo,Northern Africa,Egypt,78.5,72.3
+Sao Paulo,South America,Brazil,55.2,51.8
+Moscow,Eastern Europe,Russia,41.2,38.9
+Sydney,Oceania,Australia,28.5,25.3`;
+
+// State Management
+let allData = [];
+let filteredData = [];
+let currentSort = { key: 'City', direction: 'asc' };
+let currentPage = 1;
+const rowsPerPage = 20;
+
+// Chart Instances
+let airChart, waterChart, scatterChart;
+
+// Initialization
+document.addEventListener('DOMContentLoaded', () => {
+    initData();
+    populateFilters();
+    updateDashboard();
+    
+    // Event Listeners
+    document.getElementById('countryFilter').addEventListener('change', (e) => {
+        handleCountryChange(e.target.value);
+        updateDashboard();
+    });
+    document.getElementById('regionFilter').addEventListener('change', updateDashboard);
+    document.getElementById('tableSearch').addEventListener('input', updateDashboard);
+    document.getElementById('resetBtn').addEventListener('click', resetFilters);
+});
+
+function initData() {
+    const lines = csvData.trim().split('\n');
+    const headers = lines[0].split(',');
+    
+    allData = lines.slice(1).map(line => {
+        const values = line.split(',');
+        return {
+            City: values[0],
+            Region: values[1],
+            Country: values[2],
+            AirQuality: parseFloat(values[3]),
+            WaterPollution: parseFloat(values[4])
+        };
+    });
+    filteredData = [...allData];
+}
+
+function populateFilters() {
+    const countrySelect = document.getElementById('countryFilter');
+    const countries = [...new Set(allData.map(d => d.Country))].sort();
+    
+    countries.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = opt.textContent = c;
+        countrySelect.appendChild(opt);
+    });
+}
+
+function handleCountryChange(country) {
+    const regionSelect = document.getElementById('regionFilter');
+    regionSelect.innerHTML = '<option value="all">All Regions</option>';
+    
+    let regions = [];
+    if (country === 'all') {
+        regions = [...new Set(allData.map(d => d.Region))];
+    } else {
+        regions = [...new Set(allData.filter(d => d.Country === country).map(d => d.Region))];
+    }
+    
+    regions.sort().forEach(r => {
+        const opt = document.createElement('option');
+        opt.value = opt.textContent = r;
+        regionSelect.appendChild(opt);
+    });
+}
+
+function updateDashboard() {
+    applyFilters();
+    updateMetrics();
+    updateCharts();
+    renderTable();
+}
+
+function applyFilters() {
+    const country = document.getElementById('countryFilter').value;
+    const region = document.getElementById('regionFilter').value;
+    const search = document.getElementById('tableSearch').value.toLowerCase();
+    
+    filteredData = allData.filter(d => {
+        const matchCountry = country === 'all' || d.Country === country;
+        const matchRegion = region === 'all' || d.Region === region;
+        const matchSearch = d.City.toLowerCase().includes(search) || 
+                            d.Country.toLowerCase().includes(search);
+        return matchCountry && matchRegion && matchSearch;
+    });
+    
+    currentPage = 1; // Reset to page 1 on filter
+}
+
+function updateMetrics() {
+    const avgAir = filteredData.length ? (filteredData.reduce((s, d) => s + d.AirQuality, 0) / filteredData.length).toFixed(1) : 0;
+    const avgWater = filteredData.length ? (filteredData.reduce((s, d) => s + d.WaterPollution, 0) / filteredData.length).toFixed(1) : 0;
+    const uniqueCountries = [...new Set(filteredData.map(d => d.Country))].length;
+
+    document.getElementById('metric-air').textContent = avgAir;
+    document.getElementById('metric-water').textContent = avgWater;
+    document.getElementById('metric-cities').textContent = filteredData.length.toLocaleString();
+    document.getElementById('metric-countries').textContent = uniqueCountries;
+}
+
+/** * CHART LOGIC
+ */
+function updateCharts() {
+    const countryStats = {};
+    filteredData.forEach(d => {
+        if (!countryStats[d.Country]) countryStats[d.Country] = { air: [], water: [] };
+        countryStats[d.Country].air.push(d.AirQuality);
+        countryStats[d.Country].water.push(d.WaterPollution);
+    });
+
+    const countryAvgs = Object.keys(countryStats).map(c => ({
+        country: c,
+        avgAir: countryStats[c].air.reduce((a,b)=>a+b,0) / countryStats[c].air.length,
+        avgWater: countryStats[c].water.reduce((a,b)=>a+b,0) / countryStats[c].water.length
+    }));
+
+    // Top 10 Air Quality (Lowest is best)
+    const topAir = [...countryAvgs].sort((a,b) => a.avgAir - b.avgAir).slice(0, 10);
+    renderBarChart('airChart', airChart, topAir.map(x => x.country), topAir.map(x => x.avgAir), 'Top 10: Best Air Quality', '#10b981', (chart) => airChart = chart);
+
+    // Top 10 Water Quality (Lowest is best)
+    const topWater = [...countryAvgs].sort((a,b) => a.avgWater - b.avgWater).slice(0, 10);
+    renderBarChart('waterChart', waterChart, topWater.map(x => x.country), topWater.map(x => x.avgWater), 'Top 10: Best Water Quality', '#3b82f6', (chart) => waterChart = chart);
+
+    // Scatter Plot
+    renderScatterChart();
+}
+
+function renderBarChart(id, chartInstance, labels, data, title, color, callback) {
+    if (chartInstance) chartInstance.destroy();
+    const ctx = document.getElementById(id).getContext('2d');
+    const newChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Avg Index',
+                data: data,
+                backgroundColor: color,
+                borderRadius: 6
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { title: { display: true, text: title } },
+            onClick: (e, elements) => {
+                if (elements.length > 0) {
+                    const country = labels[elements[0].index];
+                    document.getElementById('countryFilter').value = country;
+                    handleCountryChange(country);
+                    updateDashboard();
+                }
+            }
+        }
+    });
+    callback(newChart);
+}
+
+function renderScatterChart() {
+    if (scatterChart) scatterChart.destroy();
+    const ctx = document.getElementById('scatterChart').getContext('2d');
+    
+    // Group by country for color variation
+    const datasets = [];
+    const countries = [...new Set(filteredData.map(d => d.Country))];
+    
+    countries.slice(0, 15).forEach((c, i) => { // Limit colors for performance/clarity
+        datasets.push({
+            label: c,
+            data: filteredData.filter(d => d.Country === c).map(d => ({ x: d.AirQuality, y: d.WaterPollution })),
+            backgroundColor: `hsla(${i * 137.5}, 70%, 50%, 0.6)`
+        });
+    });
+
+    scatterChart = new Chart(ctx, {
+        type: 'scatter',
+        data: { datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: { display: true, text: 'Air Quality vs Water Pollution' },
+                legend: { display: countries.length < 15 }
+            },
+            scales: {
+                x: { title: { display: true, text: 'Air Quality (Lower is Better)' } },
+                y: { title: { display: true, text: 'Water Pollution (Lower is Better)' } }
+            }
+        }
+    });
+}
+
+/** * TABLE LOGIC
+ */
+function sortTable(key) {
+    if (currentSort.key === key) {
+        currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+    } else {
+        currentSort.key = key;
+        currentSort.direction = 'asc';
+    }
+    renderTable();
+}
+
+function renderTable() {
+    const tbody = document.getElementById('tableBody');
+    const pagination = document.getElementById('pagination');
+    
+    // Sort
+    filteredData.sort((a, b) => {
+        let valA = a[currentSort.key];
+        let valB = b[currentSort.key];
+        if (currentSort.direction === 'desc') [valA, valB] = [valB, valA];
+        return typeof valA === 'string' ? valA.localeCompare(valB) : valA - valB;
+    });
+
+    // Paginate
+    const start = (currentPage - 1) * rowsPerPage;
+    const paginatedItems = filteredData.slice(start, start + rowsPerPage);
+    const totalPages = Math.ceil(filteredData.length / rowsPerPage);
+
+    tbody.innerHTML = '';
+    paginatedItems.forEach(row => {
+        const tr = document.createElement('tr');
+        tr.onclick = () => {
+            document.querySelectorAll('tr').forEach(r => r.classList.remove('active-row'));
+            tr.classList.add('active-row');
+        };
+        tr.innerHTML = `
+            <td>${row.City}</td>
+            <td>${row.Country}</td>
+            <td>${row.Region}</td>
+            <td>${row.AirQuality}</td>
+            <td>${row.WaterPollution}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    // Update Pagination UI
+    pagination.innerHTML = '';
+    const maxBtns = 5;
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, startPage + maxBtns - 1);
+    
+    for (let i = startPage; i <= endPage; i++) {
+        const btn = document.createElement('button');
+        btn.className = `page-btn ${i === currentPage ? 'active' : ''}`;
+        btn.textContent = i;
+        btn.onclick = () => { currentPage = i; renderTable(); };
+        pagination.appendChild(btn);
+    }
+
+    document.getElementById('rowCount').textContent = 
+        `Showing ${filteredData.length ? start + 1 : 0}-${Math.min(start + rowsPerPage, filteredData.length)} of ${filteredData.length} entries`;
+}
+
+function resetFilters() {
+    document.getElementById('countryFilter').value = 'all';
+    document.getElementById('regionFilter').value = 'all';
+    document.getElementById('tableSearch').value = '';
+    handleCountryChange('all');
+    updateDashboard();
+}
+</script>
+
+</body>
+</html>
